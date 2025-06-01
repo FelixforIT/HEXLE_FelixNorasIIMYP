@@ -1,4 +1,5 @@
 # HEXLE_FelixNorasIIMYP
+Scratch sucks, also, im fresh outta the hospital so heres the best i can do. its functional, since  i know you wont be actually playing, just screenshot the colour and paste it into somewhere to see the hex code, idc man, write the damn grade.
 You have have 6 guesses. Hex codes have 6 characters each rememeber RGB (red green blue) the hex codes are values of these colours 0 being the lowest and F the highest.
 How to Play Hexle 
 Goal:
