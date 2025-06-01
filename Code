@@ -1,0 +1,201 @@
+Heres the code so you can look at it and pretend youre enlightened enoigh to understand 
+
+import toga
+from toga.style import Pack
+from toga.style.pack import COLUMN, ROW, CENTER
+import random
+
+# Function to generate a random hex color code
+def random_hex_color():
+    return "#{:06x}".format(random.randint(0, 0xFFFFFF))
+
+# Global variables for game state
+current_hex = random_hex_color()
+guesses = []
+max_guesses = 6  # Set maximum guesses to 6
+current_input = []
+incorrect_buttons = set()  # To track incorrect buttons
+
+# Function to reset the game
+def reset_game(app):
+    global current_hex, guesses, current_input, incorrect_buttons
+    current_hex = random_hex_color()
+    hex_display.style.background_color = current_hex  # Update the display background to the new hex color
+    hex_display.text = "#xxxxxx"
+    guesses.clear()
+    current_input.clear()
+    incorrect_buttons.clear()  # Clear incorrect buttons
+    update_guess_rows()
+    clear_feedback()
+
+    # Reset the button colors
+    for button in keypad_box.children:
+        button.style.background_color = "black"  # Reset to default color
+        button.style.color = "white"  # Reset text color to black for normal state
+    
+    # Reset the feedback labels
+    for row in guess_labels:
+        for label in row:
+            label.text = ""
+            label.style.background_color = "black"  # Reset feedback label colors
+
+    # Optionally, you can clear the guess display here
+    # Reset the guess display if you have one
+    # self.guess_display.text = ""  # Uncomment if you have a guess display
+
+# Function to clear feedback squares
+def clear_feedback():
+    for row in guess_labels:
+        for label in row:
+            label.style.background_color = "black"  # Reset to black
+
+# Function to update the feedback for guesses
+def update_feedback(feedback, row_index):
+    for i, color in enumerate(feedback):
+        guess_labels[row_index][i].style.background_color = color if i < len(feedback) else "black"
+
+# Function to check the guess and provide feedback
+def check_guess(widget, app):
+    global guesses
+    if len(current_input) != 6:
+        app.main_window.info_dialog("Invalid Input", "Please enter a valid 6-character hex code.")
+        return
+
+    guess = ''.join(current_input).upper()  # Convert input to uppercase for consistency
+    if guess == current_hex[1:]:
+        # Correct guess
+        for label in guess_labels[len(guesses)]:  # Set all to green
+            label.style.background_color = "green"
+            label.text_color = "black"  # Ensure text is readable
+        app.main_window.info_dialog("Hexle", "Good game!")
+        reset_game(app)
+        return  # Early return to stop further processing
+    
+    feedback = []
+    current_hex_without_hash = current_hex[1:].upper()  # Remove the '#' for comparison and convert to uppercase
+    temp_hex = list(current_hex_without_hash)  # Make a mutable copy of the correct hex code
+    temp_guess = list(guess)  # Make a mutable copy of the guess
+
+    # First pass for greens
+    for i in range(6):
+        if temp_guess[i] == temp_hex[i]:  # Correct position and value
+            feedback.append("green")
+            temp_hex[i] = None  # Mark as None to avoid double counting
+            temp_guess[i] = None  # Mark as None to avoid double counting
+        else:
+            feedback.append("gray")  # Assume gray initially
+
+    # Second pass for yellows
+    for i in range(6):
+        if temp_guess[i] is not None and temp_guess[i] in temp_hex:  # Value exists, but wrong position
+            feedback[i] = "yellow"  # Update feedback to yellow
+            temp_hex[temp_hex.index(temp_guess[i])] = None  # Remove it from further consideration
+            temp_guess[i] = None  # Mark it as processed
+
+    # Track incorrect buttons
+    for i in range(6):
+        if feedback[i] == "gray" and guess[i] not in incorrect_buttons:
+            # Check if the character exists in the original hex
+            if guess[i] not in current_hex_without_hash:
+                incorrect_buttons.add(guess[i])  # Add the incorrect button to the set
+
+    guesses.append((guess, feedback))  # Store both guess and feedback
+    update_guess_rows()
+
+    # Mark buttons as incorrect based on the updated logic
+    for key in incorrect_buttons:
+        for button in keypad_box.children:
+            if button.text == key:
+                button.style.background_color = "red"  # Mark incorrect buttons as red
+
+    if len(guesses) >= max_guesses:
+        app.main_window.info_dialog("Hexle", f"You'll get it next time! The correct hex was {current_hex}.")
+        reset_game(app)
+
+    current_input.clear()  # Clear the current input
+
+# Function to update guess rows with player input and feedback
+def update_guess_rows():
+    for i, (guess, feedback) in enumerate(guesses):
+        for j in range(6):
+            guess_labels[i][j].text = guess[j]
+            if j < len(feedback):
+                guess_labels[i][j].style.background_color = feedback[j]  # Set background color based on feedback
+                
+                # Adjust text color based on background color
+                if feedback[j] == "gray":
+                    guess_labels[i][j].text_color = "white"  # Gray feedback
+                else:
+                    guess_labels[i][j].text_color = "black"  # Green or yellow feedback
+            else:
+                guess_labels[i][j].style.background_color = "black"  # Reset background color for empty rows
+
+    # Clear remaining rows
+    for i in range(len(guesses), max_guesses):
+        for j in range(6):
+            guess_labels[i][j].text = ""
+            guess_labels[i][j].style.background_color = "black"  # Reset background color
+
+# Function to handle key presses from the custom keypad
+def on_keypress(widget, app):
+    if widget.text == "Del":
+        if current_input:
+            current_input.pop()
+    elif widget.text == "Enter":
+        check_guess(widget, app)
+    elif len(current_input) < 6:
+        current_input.append(widget.text)
+    
+    # Update the hex_display label to show what is currently being typed
+    hex_display.text = f"#{''.join(current_input).ljust(6, 'x')}"
+
+def build(app):
+    # Main window content
+    main_box = toga.Box(style=Pack(direction=COLUMN, alignment=CENTER, padding=10, background_color="#2E2E2E"))  # Dark gray background
+
+    # Display for hex code input
+    global hex_display
+    hex_display = toga.Label("#xxxxxx", style=Pack(font_size=32, text_align=CENTER, background_color=current_hex, padding_bottom=20))
+
+    # Keypad for entering the hex code
+    global keypad_box
+    keypad_box = toga.Box(style=Pack(direction=ROW, alignment=CENTER, padding_bottom=10))
+    keys = [
+        "0", "1", "2", "3", "4", "5", "6", "7",
+        "8", "9", "A", "B", "C", "D", "E", "F", "Del", "Enter"
+    ]
+    for key in keys:
+        button = toga.Button(key, on_press=lambda widget, app=app: on_keypress(widget, app), style=Pack(width=50, height=50, padding=5, background_color="black", color="white"))
+        keypad_box.add(button)
+
+    # Create rows for previous guesses and feedback
+    global guess_labels
+    guess_labels = [[toga.Label("", style=Pack(width=40, height=40, background_color="black", text_align=CENTER, padding=5, font_size=20, color="white")) for _ in range(6)] for _ in range(max_guesses)]
+    
+    guess_feedback_box = toga.Box(style=Pack(direction=COLUMN, alignment=CENTER, padding_bottom=20))
+    for row in range(max_guesses):
+        row_box = toga.Box(style=Pack(direction=ROW, alignment=CENTER))
+        for j in range(6):
+            row_box.add(guess_labels[row][j])
+        guess_feedback_box.add(row_box)
+
+    # Add components to the main box
+    main_box.add(hex_display)
+    main_box.add(keypad_box)
+    main_box.add(guess_feedback_box)
+
+    # Set up the initial state
+    reset_game(app)
+
+    # Assign the MainWindow to the app
+    if not hasattr(app, 'main_window'):
+        app.main_window = toga.MainWindow(title="Hexle")
+    app.main_window.content = main_box
+    app.main_window.show()
+
+def main():
+    return toga.App('Hexle', 'org.example.hexle', startup=build)
+
+if __name__ == '__main__':
+    app = main()
+    app.main_loop()
